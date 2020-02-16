@@ -1,0 +1,35 @@
+{
+  "name": "prhfi-bis",
+  "version": "1.0.0",
+  "description": "A small wrapper of Finnish Patent and Registration Office BIS v1 api",
+  "main": "build/index.js",
+  "scripts": {
+    "build": "npx tsc",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kkuzar/prhfi-bis.git"
+  },
+  "keywords": [
+    "PRH",
+    "Finnish",
+    "Patent",
+    "and",
+    "Registration",
+    "BIS",
+    "v1",
+    "Finland"
+  ],
+  "author": "Kuzar Kyzyrbek",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/kkuzar/prhfi-bis/issues"
+  },
+  "homepage": "https://github.com/kkuzar/prhfi-bis#readme",
+  "devDependencies": {
+    "@types/node": "^13.7.1",
+    "jest": "^25.1.0",
+    "typescript": "^3.7.5"
+  }
+}
