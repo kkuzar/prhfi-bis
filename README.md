@@ -115,18 +115,20 @@ e.g.
 
 ```typescript
 // Custom return body format
-export type StructedCompanyInfomation = {
-    name:  (string | null),
-    businessId :  (string | null),
-    companyForm: (string | null),
-    website:  (string | null),
-    latestAddr:  (string | null),
-    latestPost:  (string | null),
-    latestCity:  (string | null),
-    latestBusinessCode:  (string | null),
-    latestBusinessLine:  (string | null),
-    latestAuxiliaryNames:  (string | null),
-}
+protected initStructedCompanyInfomation(): StructedCompanyInfomation {
+        return {
+            name: null,
+            businessId: null,
+            companyForm: null,
+            website: null,
+            latestAddr: null,
+            latestPost: null,
+            latestCity: null,
+            latestBusinessCode: null,
+            latestBusinessLine: null,
+            latestAuxiliaryNames: null,
+        }
+    }
 ```
 
 the return value will be `StructedCompanyInfomation` or array of it `StructedCompanyInfomation[]`
@@ -194,3 +196,26 @@ example code snippet
  });
 ```
 
+This helper will return a query object type has strutrue as following:
+
+```typescript
+ protected initBisCompanyDetailQueryObject() {
+        let res: BisRequestQueryDetail = {
+            totalResults: "false",
+            maxResults: "10",
+            resultsFrom: "0",
+            name: "",
+            businessId: "",
+            registeredOffice: "",
+            streetAddressPostCode: "",
+            companyForm: "",
+            businessLine: "",
+            businessLineCode: "",
+            companyRegistrationFrom: "",
+            companyRegistrationTo: ""
+        };
+        return res;
+    }
+```
+
+For now it will only validate the ``companyForm`` , ``companyRegistrationFrom``, ``companyRegistrationTo``.
