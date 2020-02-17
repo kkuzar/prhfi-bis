@@ -15,6 +15,7 @@ const defaultOptions: BisConfig = {
     port: 443,
     path: "/bis/v1",
     method: "GET",
+    protocol: "https"
 };
 
 export class BisApi {
@@ -127,7 +128,7 @@ export class BisApi {
         let reg = FINNISH_BUSINESS_ID.exec(input.businessId);
         if (reg === null) throw new Error("business Id is not Valid");
 
-        let url =  ["https://", this.options.hostname, this.options.path, "/", input.businessId].join("");
+        let url =  [that.options.protocol, "://", this.options.hostname, this.options.path, "/", input.businessId].join("");
 
         const response = await that.ajaxGetRequests(url)
             .then((res) => {
@@ -156,7 +157,7 @@ export class BisApi {
             })
         }
 
-        let url = ["https://", that.options.hostname, that.options.path, "?", getQuery.join("&")].join("");
+        let url = [that.options.protocol, "://", that.options.hostname, that.options.path, "?", getQuery.join("&")].join("");
 
         const response = await that.ajaxGetRequests(url)
             .then((res) => {

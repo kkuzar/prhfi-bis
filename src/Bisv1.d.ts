@@ -10,9 +10,10 @@
 // subtypes
 export type BisConfig = {
     hostname: string,
-    port: number,
+    port?: number,
     path: string,
     method: string,
+    protocol: string,
 }
 
 export type BisCompany = {
