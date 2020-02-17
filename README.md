@@ -1,6 +1,12 @@
 # prhfi-bis
 a small wrapper of Finnish Patent and Registration Office BIS v1 api  
-original document for the API [here](https://avoindata.prh.fi/ytj_en.html)
+*original document* for the API => [avoindata.prh.fi](https://avoindata.prh.fi/ytj_en.html)
+
+# Table of Contents
+1. [How to Install](#install)
+2. [API functions](#api-functions)
+3. [Helper Function](#helper-functions)
+
 
 ## install 
 
@@ -144,7 +150,7 @@ const res = await bis.getCompanyWithParam({
 
 #### example return for Structed Information:
 
-```json
+```text
 [
   {
     name: 'Suomen Ajoneuvotekniikka Oy',
@@ -173,3 +179,18 @@ const res = await bis.getCompanyWithParam({
   ...
 ]
 ```
+
+## Helper Functions
+
+### Assemble a company Request Query With Object that has same key `typeQueryBody(inputObj: object)`
+
+example code snippet
+```javascript
+ let bis = new BisApi();
+ let res = bis.typeQueryBody({
+     name: "KES",
+     companyRegistrationFrom: "1999-01-01",
+     companyForm: "OY"
+ });
+```
+
