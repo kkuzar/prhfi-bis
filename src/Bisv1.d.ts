@@ -178,6 +178,18 @@ export type  BisRequestQueryCompanyNumber = {
     businessId: string
 }
 
+export type StructedCompanyInfomation = {
+    name:  (string | null),
+    businessId :  (string | null),
+    companyForm: (string | null),
+    website:  (string | null),
+    latestAddr:  (string | null),
+    latestPost:  (string | null),
+    latestCity:  (string | null),
+    latestBusinessCode:  (string | null),
+    latestBusinessLine:  (string | null),
+    latestAuxiliaryNames:  (string | null),
+}
 
 
 

@@ -1,14 +1,23 @@
 import https from 'https'
 import {
-    BisAddress, BisCompanyBusinessIdChange, BisCompanyBusinessLine, BisCompanyContactDetail,
-    BisCompanyForm, BisCompanyLanguage,
+    BisAddress,
+    BisCompany,
+    BisCompanyBusinessIdChange,
+    BisCompanyBusinessLine,
+    BisCompanyContactDetail,
+    BisCompanyDetails,
+    BisCompanyForm,
+    BisCompanyLanguage,
     BisCompanyLiquidation,
-    BisCompanyName, BisCompanyRegisteredEntry, BisCompanyRegisteredOffice,
+    BisCompanyName,
+    BisCompanyRegisteredEntry,
+    BisCompanyRegisteredOffice,
+    BisConfig,
     BisRequestQueryCompanyNumber,
-    BisReturnBody, BisCompany
+    BisRequestQueryDetail,
+    BisReturnBody,
+    StructedCompanyInfomation
 } from "./Bisv1";
-import {BisRequestQueryDetail, BisCompanyDetails, BisConfig} from "./Bisv1";
-
 
 const defaultOptions: BisConfig = {
     hostname: "avoindata.prh.fi",
@@ -23,6 +32,8 @@ export class BisApi {
     public options: BisConfig;
     public responseString: string = "";
 
+// ================ Exposed functions below ========================================
+
     public constructor(options: (BisConfig | null)) {
         if ((options === null) || (typeof options === 'undefined')) {
             this.options = defaultOptions;
@@ -31,6 +42,10 @@ export class BisApi {
         }
     }
 
+    /**
+     * init and get a proper query object for query with Id.
+     * @param busid
+     */
     public initBisCompanyNumberQueryObject(busid: string) {
         let res: BisRequestQueryCompanyNumber = {
             businessId: busid
@@ -39,25 +54,11 @@ export class BisApi {
     }
 
     /**
-     *  Query By Company Id Entrance
-     * @param inputId
-     */
-    public async checkCompanyWithBusinessId(inputId: string) {
-        let requestObj = this.initBisCompanyNumberQueryObject(inputId);
-        return this.queryCompanyNumber(requestObj);
-    }
-
-    /**
-     *  Query By Company Object in different field Entrance
+     * init and get a proper query object with query with params.
      * @param inputObj
      */
-    public async checkCompanyWithQueryObject(inputObj: object) {
-        let queryObj: BisRequestQueryDetail = this.typeQueryBody(inputObj);
-        return this.queryWithCompanyObject(queryObj);
-    }
-
-    public typeQueryBody(inputObj: object) : BisRequestQueryDetail {
-        let companyQuery : BisRequestQueryDetail = this.initBisCompanyDetailQueryObject();
+    public typeQueryBody(inputObj: object): BisRequestQueryDetail {
+        let companyQuery: BisRequestQueryDetail = this.initBisCompanyDetailQueryObject();
         this.validateCompanyQueryInput(inputObj);
 
         // @ts-ignore
@@ -88,39 +89,159 @@ export class BisApi {
         return companyQuery;
     }
 
-    protected validateCompanyQueryInput(inputObj: object){
-         let companyType = {AOY:"AOY",OYJ:"OYJ",OY:"OY",OK:"OK",VOJ:"VOJ"};
-         if (inputObj.hasOwnProperty("companyRegistrationFrom") || inputObj.hasOwnProperty("companyRegistrationTo")) {
-             // @ts-ignore
-             if (!this.isValidDate(inputObj.companyRegistrationFrom) && inputObj.companyRegistrationFrom) {
-                 throw  new Error("companyRegistrationFrom the Date is not in Valid form");
-             }
-             // @ts-ignore
-             if (!this.isValidDate(inputObj.companyRegistrationTo) && inputObj.companyRegistrationTo) {
-                 throw  new Error("companyRegistrationTo the Date is not in Valid form");
-             }
-         }
-
-         if (inputObj.hasOwnProperty("companyForm")) {
-             // @ts-ignore
-             if (inputObj.companyForm  && !(String(inputObj.companyForm).toUpperCase() in companyType)){
-                 throw  new Error("companyForm is not in Valid form");
-             }
-         }
+    /**
+     *  Query By Company Id Entrance
+     * @param inputId
+     */
+    public async getCompanyDetailWithBusinessId(inputId: string) {
+        let requestObj = this.initBisCompanyNumberQueryObject(inputId);
+        return await this.queryCompanyNumber(requestObj);
     }
 
-    protected  isValidDate(dateString: string) {
+    /**
+     *  Query By Company Object in different field Entrance
+     * @param inputObj
+     */
+    public async getCompanyDetailWithQueryParam(inputObj: object) {
+        let queryObj: BisRequestQueryDetail = this.typeQueryBody(inputObj);
+        return await this.queryWithCompanyObject(queryObj);
+    }
+
+    /**
+     * return structed data of company by business Id.
+     * @param inputId
+     */
+    public async getCompanyWithBID(inputId: string): Promise<StructedCompanyInfomation[]> {
+        let that = this;
+        let requestObj = that.initBisCompanyNumberQueryObject(inputId);
+        let returnBody = await that.queryCompanyNumber(requestObj);
+
+        if (returnBody.results.length === 0) return [];
+        let res = await that.parsingResultsToStructed(returnBody.results);
+        return Promise.all(res);
+    }
+
+    /**
+     * return structed data of company by query params.
+     * @param inputObj
+     */
+    public async getCompanyWithParam(inputObj: object) {
+        let that = this;
+        let queryObj: BisRequestQueryDetail = that.typeQueryBody(inputObj);
+        let returnBody = await that.queryWithCompanyObject(queryObj);
+        let companysResults: StructedCompanyInfomation [] = [];
+
+        if (returnBody.results.length === 0) return [];
+
+        if (returnBody.results.length === 1) {
+            // This is the case that located only one company, which will return full detail.
+            // With this case do exactly like the things we do in fetch by business Id.
+            return  Promise.all(that.parsingResultsToStructed(returnBody.results));
+        }
+
+        if (returnBody.results.length > 1) {
+            // This case have to iterate the breif msg.
+            let urls = returnBody.results.map(function (e) {
+                if (e.detailsUri) {
+                    return e.detailsUri
+                }
+            });
+
+            let ids = urls.map(function (e) {
+                if (String(e).length) {
+                    let strArr = String(e).split("/");
+                    return strArr[strArr.length - 1];
+                }
+            });
+
+            let loop = 0;
+            for (loop; loop < ids.length; loop++) {
+                let tmp = await this.getCompanyWithBID(String(ids[loop]));
+                if (tmp.length) {
+                    companysResults.push(tmp[0]);
+                }
+            }
+
+        }
+        return companysResults;
+    }
+
+// ==================== internal functions below ===========================================
+
+    protected parsingResultsToStructed(results: BisCompanyDetails[]) {
+        let that = this;
+        return results.map(async function (e) {
+            let companyItem: StructedCompanyInfomation = that.initStructedCompanyInfomation();
+            companyItem.name = e.name;
+            companyItem.businessId = e.businessId;
+            companyItem.companyForm = e.companyForm;
+            // @ts-ignore
+            companyItem.latestAddr = await that.fetchFirstLatestValueByKey("registrationDate", "street", e.addresses);
+            // @ts-ignore
+            companyItem.latestPost = await that.fetchFirstLatestValueByKey("registrationDate", "postCode", e.addresses);
+            // @ts-ignore
+            companyItem.latestPost = await that.fetchFirstLatestValueByKey("registrationDate", "city", e.addresses);
+            // @ts-ignore
+            companyItem.latestAuxiliaryNames = await that.fetchFirstLatestValueByKey("registrationDate", "name", e.auxiliaryNames);
+            // @ts-ignore
+            companyItem.website = await that.fetchFirstLatestValueByKey("registrationDate", "value", e.contactDetails);
+            // @ts-ignore
+            companyItem.latestBusinessCode = await that.fetchFirstLatestValueByKey("registrationDate", "code", e.businessLines);
+            // @ts-ignore
+            companyItem.latestBusinessLine = await that.fetchFirstLatestValueByKey("registrationDate", "name", e.businessLines);
+
+            // @ts-ignore
+            return companyItem;
+        });
+    }
+
+    protected fetchFirstLatestValueByKey(sortKey: string, key: string, inputArr: []) {
+        let sortedArr = inputArr.sort((a: object, b: object) => {
+            // @ts-ignore
+            return (Date(a[sortKey]) > Date(b[sortKey])) ? 1 : -1;
+        });
+
+        if (sortedArr.length) {
+            // @ts-ignore
+            return sortedArr[0][key];
+        }
+        return ""
+    }
+
+    protected validateCompanyQueryInput(inputObj: object) {
+        let companyType = {AOY: "AOY", OYJ: "OYJ", OY: "OY", OK: "OK", VOJ: "VOJ"};
+        if (inputObj.hasOwnProperty("companyRegistrationFrom") || inputObj.hasOwnProperty("companyRegistrationTo")) {
+            // @ts-ignore
+            if (!this.isValidDate(inputObj.companyRegistrationFrom) && inputObj.companyRegistrationFrom) {
+                throw  new Error("companyRegistrationFrom the Date is not in Valid form");
+            }
+            // @ts-ignore
+            if (!this.isValidDate(inputObj.companyRegistrationTo) && inputObj.companyRegistrationTo) {
+                throw  new Error("companyRegistrationTo the Date is not in Valid form");
+            }
+        }
+
+        if (inputObj.hasOwnProperty("companyForm")) {
+            // @ts-ignore
+            if (inputObj.companyForm && !(String(inputObj.companyForm).toUpperCase() in companyType)) {
+                throw  new Error("companyForm is not in Valid form");
+            }
+        }
+    }
+
+    protected isValidDate(dateString: string) {
         var regEx = /^\d{4}-\d{2}-\d{2}$/g;
-        if(!regEx.exec(dateString)) return false;  // Invalid format
+        if (!regEx.exec(dateString)) return false;  // Invalid format
         var d = new Date(dateString);
         var dNum = d.getTime();
-        if(!dNum && dNum !== 0) return false; // NaN value, Invalid date
-        return d.toISOString().slice(0,10) === dateString;
+        if (!dNum && dNum !== 0) return false; // NaN value, Invalid date
+        return d.toISOString().slice(0, 10) === dateString;
     }
 
     /**
      * Process the case when there for BIS/V1/{businessID}
      * @param input
+     *
      */
     protected async queryCompanyNumber(input: BisRequestQueryCompanyNumber): Promise<BisReturnBody> {
         let that = this;
@@ -128,7 +249,7 @@ export class BisApi {
         let reg = FINNISH_BUSINESS_ID.exec(input.businessId);
         if (reg === null) throw new Error("business Id is not Valid");
 
-        let url =  [that.options.protocol, "://", this.options.hostname, this.options.path, "/", input.businessId].join("");
+        let url = [that.options.protocol, "://", this.options.hostname, this.options.path, "/", input.businessId].join("");
 
         const response = await that.ajaxGetRequests(url)
             .then((res) => {
@@ -142,17 +263,18 @@ export class BisApi {
     /**
      * Process for the case check with query
      * @param queryObj
+     *
      */
-    protected async queryWithCompanyObject(queryObj: BisRequestQueryDetail) {
+    protected async queryWithCompanyObject(queryObj: BisRequestQueryDetail): Promise<BisReturnBody> {
         let that = this;
-        let getQuery : string[] = [];
+        let getQuery: string[] = [];
 
         if (queryObj) {
             Object.keys(queryObj).map(function (k, i) {
                 // @ts-ignore
-                if ( queryObj[k] !== null && (typeof  queryObj[k] !== 'undefined') && (queryObj[k] !== "")) {
+                if (queryObj[k] !== null && (typeof queryObj[k] !== 'undefined') && (queryObj[k] !== "")) {
                     // @ts-ignore
-                    getQuery.push(k +"=" + queryObj[k]);
+                    getQuery.push(k + "=" + encodeURI(queryObj[k]));
                 }
             })
         }
@@ -207,7 +329,7 @@ export class BisApi {
         return dataReturn;
     }
 
- // ====================== initializers ===================================
+    // ====================== initializers ===================================
 
     protected initBisCompanyDetailQueryObject() {
         let res: BisRequestQueryDetail = {
@@ -261,7 +383,7 @@ export class BisApi {
         }
     }
 
-    protected initBisCompanyName() : BisCompanyName {
+    protected initBisCompanyName(): BisCompanyName {
         return {
             source: null,
             order: 0,
@@ -273,7 +395,7 @@ export class BisApi {
         }
     }
 
-    protected initBisAddress() : BisAddress {
+    protected initBisAddress(): BisAddress {
         return {
             source: null,
             version: 0,
@@ -281,15 +403,15 @@ export class BisApi {
             endDate: null,
             careOf: null,
             street: null,
-            postCode:  null,
+            postCode: null,
             city: null,
-            language:  null,
+            language: null,
             type: 0,
-            country:  null,
+            country: null,
         }
     }
 
-    protected initBisCompanyForm() : BisCompanyForm {
+    protected initBisCompanyForm(): BisCompanyForm {
         return {
             source: null,
             version: 0,
@@ -301,7 +423,7 @@ export class BisApi {
         }
     }
 
-    protected initBisCompanyLiquidation() : BisCompanyLiquidation {
+    protected initBisCompanyLiquidation(): BisCompanyLiquidation {
         return {
             source: null,
             version: 0,
@@ -313,9 +435,9 @@ export class BisApi {
         }
     }
 
-    protected initBisCompanyBusinessLine() : BisCompanyBusinessLine {
+    protected initBisCompanyBusinessLine(): BisCompanyBusinessLine {
         return {
-            source:  null,
+            source: null,
             order: 0,
             version: 0,
             registrationDate: "",
@@ -325,7 +447,7 @@ export class BisApi {
         }
     }
 
-    protected initBisCompanyLanguage() : BisCompanyLanguage {
+    protected initBisCompanyLanguage(): BisCompanyLanguage {
         return {
             source: null,
             version: 0,
@@ -336,19 +458,19 @@ export class BisApi {
         }
     }
 
-    protected initBisCompanyRegisteredOffice() : BisCompanyRegisteredOffice {
+    protected initBisCompanyRegisteredOffice(): BisCompanyRegisteredOffice {
         return {
             source: null,
             order: 0,
             version: 0,
             registrationDate: "",
-            endDate:  null,
+            endDate: null,
             name: "",
-            language:  null,
+            language: null,
         }
     }
 
-    protected initBisCompanyContactDetail() : BisCompanyContactDetail {
+    protected initBisCompanyContactDetail(): BisCompanyContactDetail {
         return {
             source: null,
             version: 0,
@@ -360,19 +482,19 @@ export class BisApi {
         }
     }
 
-    protected initBisCompanyRegisteredEntry() : BisCompanyRegisteredEntry {
+    protected initBisCompanyRegisteredEntry(): BisCompanyRegisteredEntry {
         return {
             description: "",
             status: 0,
             registrationDate: "",
-            endDate:  null,
+            endDate: null,
             register: 0,
             language: null,
             authority: 0,
         }
     }
 
-    protected initBisCompanyBusinessIdChange() : BisCompanyBusinessIdChange {
+    protected initBisCompanyBusinessIdChange(): BisCompanyBusinessIdChange {
         return {
             source: null,
             description: "",
@@ -385,14 +507,28 @@ export class BisApi {
         }
     }
 
-    protected initBisCompany () : BisCompany {
+    protected initBisCompany(): BisCompany {
         return {
             businessId: "",
             registrationDate: "",
-            companyForm:  null,
-            detailsUri:  null,
+            companyForm: null,
+            detailsUri: null,
             name: ""
         }
     }
 
+    protected initStructedCompanyInfomation(): StructedCompanyInfomation {
+        return {
+            name: null,
+            businessId: null,
+            companyForm: null,
+            website: null,
+            latestAddr: null,
+            latestPost: null,
+            latestCity: null,
+            latestBusinessCode: null,
+            latestBusinessLine: null,
+            latestAuxiliaryNames: null,
+        }
+    }
 }
